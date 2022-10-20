@@ -313,6 +313,9 @@ class MainWindow(QMainWindow):
                 else:
                     self.ui.tableWidget.item(row,col+1).setText((str(dny_present + dny_transfer)))
 
+            if(col == 8):
+                if(self.ui.tableWidget.item(row,col).text != ""):
+                    pass
 
     # Open dialog with button ok
     def open_messagebox_value_error(self, word: str):
