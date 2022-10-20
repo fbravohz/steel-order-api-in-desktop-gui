@@ -23,7 +23,8 @@ from PySide2.QtWidgets import (
     QTableWidgetItem,
     QComboBox,
     QMessageBox,
-    QPushButton
+    QPushButton,
+    QStyle
 )
 from PySide2.QtCore import (
     Signal,
@@ -116,7 +117,7 @@ class MainWindow(QMainWindow):
                     #     #self.ui.tableWidget.setItem(rows, cols, item)
                     # else:
                     item.setText(str(data.iloc[rows, cols]))
-                    if (cols != 3 and cols != 5 and cols != 6):
+                    if (cols != 5 and cols != 7 and cols != 8):
                         item.setFlags(Qt.ItemIsEditable)
                     self.ui.tableWidget.setItem(rows, cols, item)
             self.ui.tableWidget.resizeColumnsToContents()
@@ -177,6 +178,8 @@ class MainWindow(QMainWindow):
 
     def table_pull_data(self):
 
+        self.ui.pushButton_save.setStyleSheet("")
+
         txt_cmbx_dny = self.ui.comboBox_destiny.currentText()
         txt_cmbx_ogn = self.ui.comboBox_origin.currentText()
 
@@ -196,7 +199,7 @@ class MainWindow(QMainWindow):
         num_cols = self.ui.tableWidget.columnCount()
         num_rows = self.ui.tableWidget.rowCount()
 
-        current_dataframe = pd.DataFrame(columns=['codigo','nombre','presente','traspaso',
+        current_dataframe = pd.DataFrame(columns=['id-almacen','id-producto','codigo','nombre','presente','traspaso',
                                         'futuro','error','codigo-error'],
                                         index=range(num_rows))
 
@@ -205,14 +208,19 @@ class MainWindow(QMainWindow):
                 current_dataframe.iloc[row,col] = self.ui.tableWidget.item(row,col).data(0)
         current_dataframe = current_dataframe.sort_values(by=['codigo'],ignore_index=True)
         self.data_dny = current_dataframe
-        print(self.data_dny)
 
 
     def table_save_data(self):
 
         self.table_get_current_data()
+        pandas_to_pyside = PandasToPyside()
+        success = pandas_to_pyside.put_warehouses_products(self.data_ogn,self.data_dny)
         #In the end this should call the pull table widget to refresh changes
-        self.ui.pushButton_pull.click()
+        if success:
+            self.ui.pushButton_pull.click()
+            self.ui.pushButton_save.setStyleSheet("color: #005014")
+        else:
+            self.ui.pushButton_save.setStyleSheet("color: #740000")
 
 
     def table_evaluate_cell_changed(self,row,col):
@@ -220,7 +228,7 @@ class MainWindow(QMainWindow):
         # if the event cell doubleClicked has happened just before editing. Otherwise means
         # that the cell wasn't modified by a user but by the algorithm.
         if self.isDoubleClicked:
-            if(col == 3):
+            if(col == 5):
 
                 # This statement ensures that when you delete data on cell, it becomes 0
                 if self.ui.tableWidget.item(row,col).data(0) == "":
@@ -232,6 +240,11 @@ class MainWindow(QMainWindow):
                 try:
                     # If a non numeric value is present an exception is raised of type ValueError
                     dny_transfer = int(self.ui.tableWidget.item(row,col).data(0))
+                    #
+                    if dny_transfer < 0:
+                        self.open_messagebox_negative_number()
+                        self.ui.tableWidget.item(row,col).setText(str(0))
+                        return None
                 except ValueError:
                     # Opens a dialog with a warning of a non numeric value
                     self.open_messagebox_value_error(str(self.ui.tableWidget.item(row,col).data(0)))
@@ -239,7 +252,10 @@ class MainWindow(QMainWindow):
                     self.ui.tableWidget.item(row,col).setText(str(0))
 
                 # Gets the full-reference string of the modified product stored in column 0
-                dny_transfer_product = str(self.ui.tableWidget.item(row,0).data(0))
+                for i in range(self.ui.tableWidget.columnCount()):
+                    header_item: QTableWidgetItem = self.ui.tableWidget.horizontalHeaderItem(i)
+                    if(header_item.text() == 'codigo'):
+                        dny_transfer_product = str(self.ui.tableWidget.item(row,i).data(0))
 
                 # Create a mask or filter, in order to find the cells
                 # that contain the full-reference of product in the origin dataframe
@@ -272,7 +288,7 @@ class MainWindow(QMainWindow):
                 dny_present = int(self.ui.tableWidget.item(row,col-1).data(0))
 
                 # Evaluate if the future value of origin dataframe is less equal to 0
-                if(self.data_ogn.at[idx,'futuro'] <= 0):
+                if(self.data_ogn.at[idx,'futuro'] < 0):
 
                     # Opens a messagebox with the warning of insuficient stock
                     self.open_messagebox_no_stock(self.ui.comboBox_origin.currentText(), dny_transfer_product, str(ogn_present), str(ogn_future))
@@ -328,6 +344,13 @@ class MainWindow(QMainWindow):
         self.messagebox_forbidden.setStandardButtons(QMessageBox.Ok)
         self.messagebox_forbidden.exec_()
 
+    def open_messagebox_negative_number(self):
+        self.messagebox_forbidden = QMessageBox()
+        self.messagebox_forbidden.setWindowTitle("Prohibido")
+        self.messagebox_forbidden.setText(f"No se permite hacer traspasos negativos.")
+        self.messagebox_forbidden.setIcon(QMessageBox.Warning)
+        self.messagebox_forbidden.setStandardButtons(QMessageBox.Ok)
+        self.messagebox_forbidden.exec_()
 
 
 

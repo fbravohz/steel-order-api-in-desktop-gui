@@ -1,4 +1,5 @@
 from enum import Enum
+from operator import index
 import pandas as pd
 from SteelOrderToPandas import SteelOrderToPandas
 
@@ -15,6 +16,7 @@ class PandasToPyside():
     def __init__(self) -> None:
         self.dataframe_origin: pd.DataFrame
         self.dataframe_destiny: pd.DataFrame
+        self.steel_order_to_pandas = SteelOrderToPandas()
 
 
     def get_products_by_warehouse(self, warehouse_name: str,
@@ -37,7 +39,7 @@ class PandasToPyside():
             pd.DataFrame: Returns a dataframe with the structure desired
             to be plotted into QTableWidget. The structure of this pd is:
 
-            >>> my_dictionary = {"codigo":[],"nombre":[],"presente":[],
+            >>> my_dictionary = {"id-almacen": [],"id-producto": [], "codigo":[],"nombre":[],"presente":[],
             >>> "traspaso":[],"futuro":[],"error":[],"codigo-error":[]}
         """
         # if kind is different to origin or destiny, is a bad function call.
@@ -52,7 +54,7 @@ class PandasToPyside():
         my_products = my_api.request_products()
 
         # Create the dictionary that will contain the structured data
-        my_dictionary = {"codigo": [], "nombre": [], "presente": [], "traspaso": [],
+        my_dictionary = {'id-almacen': [],'id-producto': [],"codigo": [], "nombre": [], "presente": [], "traspaso": [],
                         'futuro': [], "error": [], "codigo-error": []}
 
         # Create a filter that matches the given warehouse's name in dataframe
@@ -87,6 +89,10 @@ class PandasToPyside():
             # The object is converted into a string without index in it
             product_name = product_filtered.to_string(index=False)
 
+            #
+            product_id = my_products[product_filter].loc[:,'id']
+            product_id = int(product_id.to_string(index=False))
+
             # Create a variable that stores the stock of product in warehouse
             warehouse_real_stock = 0
 
@@ -118,6 +124,8 @@ class PandasToPyside():
 
             # The last process is to fill the row with the current product and
             # the received warehouse's data.
+            my_dictionary['id-almacen'].append(warehouse_id)
+            my_dictionary['id-producto'].append(product_id)
             my_dictionary['codigo'].append(product_full_reference)
             my_dictionary['nombre'].append(product_name)
             my_dictionary['presente'].append(warehouse_real_stock)
@@ -138,5 +146,35 @@ class PandasToPyside():
             return self.dataframe_destiny
 
 
-    def put_warehouses_products():
-        
+    def put_warehouses_products(self, df_origin: pd.DataFrame, df_destiny: pd.DataFrame):
+
+        # Convert the data that should be int from string to int32
+        df_destiny = df_destiny.astype({'traspaso':'int','presente':'int', 'futuro': 'int', 'error': 'int'})
+        df_origin = df_origin.astype({'traspaso':'int','presente':'int', 'futuro': 'int', 'error': 'int'})
+        mask_origin = df_origin['traspaso'] != 0
+        mask_destiny = df_destiny['traspaso'] != 0
+        changes_in_origin = df_origin[mask_origin]
+        changes_in_destiny = df_destiny[mask_destiny]
+
+        if changes_in_origin.index.size == 0 and changes_in_destiny.index.size == 0:
+            return False
+
+        for row in changes_in_destiny.index:
+            destiny_new_quantity = changes_in_destiny.loc[row,'futuro']
+            destiny_warehouse_id = changes_in_destiny.loc[row,'id-almacen']
+            destiny_product_id = changes_in_destiny.loc[row,'id-producto']
+            self.steel_order_to_pandas.put_product_into_warehouse(destiny_warehouse_id,destiny_product_id,destiny_new_quantity)
+
+        for row in changes_in_origin.index:
+            origin_new_quantity = changes_in_origin.loc[row,'futuro']
+            origin_warehouse_id = changes_in_origin.loc[row,'id-almacen']
+            origin_product_id = changes_in_origin.loc[row,'id-producto']
+            self.steel_order_to_pandas.put_product_into_warehouse(origin_warehouse_id,origin_product_id,origin_new_quantity)
+
+        return True
+
+
+if __name__ == "__main__":
+    objecto = PandasToPyside()
+    #print(objecto.get_products_by_warehouse('Oficina / Almacen',0))
+    objecto.put_warehouses_products()

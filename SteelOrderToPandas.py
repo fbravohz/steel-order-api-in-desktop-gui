@@ -57,10 +57,10 @@ class SteelOrderToPandas():
 
         json_data = {
             'location': 'string',
-            'real-stock': real_stock,
-            'minimum-stock': 0,
-            'warehouse-id': warehouse_id,
-            'item-id': item_id,
+            'real-stock': str(real_stock),
+            'minimum-stock': str(0),
+            'warehouse-id': str(warehouse_id),
+            'item-id': str(item_id),
         }
         URL = 'https://app.stelorder.com/app/productWarehouses'
         response = requests.put(URL,headers=headers,json=json_data)
