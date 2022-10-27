@@ -148,7 +148,17 @@ class MainWindow(QMainWindow):
     def set_combo_box_origin(self):
         sotp = SteelOrderToPandas()
         warehouses = sotp.request_warehouses()
-        warehouses_list = warehouses['name'].to_list()
+
+        # If the warehouses['name'] key doesn't exist, means that the apikey
+        # was rejected and needs to be verified
+        try:
+            warehouses_list = warehouses['name'].to_list()
+
+        # The KeyError exception is raised, and a message is send. Exit the program.
+        except KeyError:
+            self.open_messagebox_no_key_name(sotp.status_code)
+            exit()
+
         self.ui.comboBox_origin.insertItem(0, "")
         self.ui.comboBox_origin.insertItems(1, warehouses_list)
         self.ui.comboBox_origin.currentTextChanged.connect(
@@ -238,13 +248,14 @@ class MainWindow(QMainWindow):
                 dny_present = 0
                 # Evaluate if the transfer amount in destiny table contains non numeric types
                 try:
-                    # If a non numeric value is present an exception is raised of type ValueError
                     dny_transfer = int(self.ui.tableWidget.item(row,col).data(0))
-                    #
+                    # If the amount to transfer is negative, throws a messagebox and sets the
+                    # cell changed to zero
                     if dny_transfer < 0:
                         self.open_messagebox_negative_number()
                         self.ui.tableWidget.item(row,col).setText(str(0))
                         return None
+                # If a non numeric value is present an exception is raised of type ValueError
                 except ValueError:
                     # Opens a dialog with a warning of a non numeric value
                     self.open_messagebox_value_error(str(self.ui.tableWidget.item(row,col).data(0)))
@@ -344,14 +355,23 @@ class MainWindow(QMainWindow):
         self.messagebox_forbidden.setStandardButtons(QMessageBox.Ok)
         self.messagebox_forbidden.exec_()
 
-    def open_messagebox_negative_number(self):
-        self.messagebox_forbidden = QMessageBox()
-        self.messagebox_forbidden.setWindowTitle("Prohibido")
-        self.messagebox_forbidden.setText(f"No se permite hacer traspasos negativos.")
-        self.messagebox_forbidden.setIcon(QMessageBox.Warning)
-        self.messagebox_forbidden.setStandardButtons(QMessageBox.Ok)
-        self.messagebox_forbidden.exec_()
 
+    def open_messagebox_negative_number(self):
+        self.messagebox_forbidden_negative = QMessageBox()
+        self.messagebox_forbidden_negative.setWindowTitle("Prohibido")
+        self.messagebox_forbidden_negative.setText(f"No se permite hacer traspasos negativos.")
+        self.messagebox_forbidden_negative.setIcon(QMessageBox.Warning)
+        self.messagebox_forbidden_negative.setStandardButtons(QMessageBox.Ok)
+        self.messagebox_forbidden_negative.exec_()
+
+
+    def open_messagebox_no_key_name(self, status_code: int):
+        self.messagebox_no_key_name = QMessageBox()
+        self.messagebox_no_key_name.setWindowTitle("API Key incorrecta")
+        self.messagebox_no_key_name.setText(f"Falló la autenticación.\nError del servidor: {status_code}.")
+        self.messagebox_no_key_name.setIcon(QMessageBox.Warning)
+        self.messagebox_no_key_name.setStandardButtons(QMessageBox.Ok)
+        self.messagebox_no_key_name.exec_()
 
 
 if __name__ == "__main__":

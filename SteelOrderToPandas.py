@@ -56,7 +56,7 @@ class SteelOrderToPandas():
         }
 
         json_data = {
-            'location': 'string',
+            'location': '',
             'real-stock': str(real_stock),
             'minimum-stock': str(0),
             'warehouse-id': str(warehouse_id),
