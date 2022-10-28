@@ -66,6 +66,8 @@ class MainWindow(QMainWindow):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         self.isDoubleClicked = False
+        self.current_origin = ""
+        self.current_destiny = ""
 
         # Make the window maximizable and minimizable
         self.setWindowFlag(Qt.WindowMaximizeButtonHint, True)
@@ -80,6 +82,15 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_pull.clicked.connect(self.table_pull_data)
         self.ui.tableWidget.cellDoubleClicked.connect(self.cell_double_clicked)
         self.ui.tableWidget.cellChanged.connect(self.cell_changed)
+        
+        def highlight(index: int):
+            if (self.ui.comboBox_origin.currentIndex() != 0) and (self.ui.comboBox_destiny.currentIndex() != 0):
+                if self.current_origin != "" and self.current_destiny != "":
+                    print("Highlighted at: ",index)
+                    self.open_messagebox_change_warehouse(self.current_origin, self.current_destiny)
+                    
+        self.ui.comboBox_origin.highlighted.connect(highlight)
+        self.ui.comboBox_destiny.highlighted.connect(highlight)
 
 
     def cell_double_clicked(self, row, col):
@@ -161,8 +172,7 @@ class MainWindow(QMainWindow):
 
         self.ui.comboBox_origin.insertItem(0, "")
         self.ui.comboBox_origin.insertItems(1, warehouses_list)
-        self.ui.comboBox_origin.currentTextChanged.connect(
-            self.set_combo_box_destiny)
+        self.ui.comboBox_origin.currentTextChanged.connect(self.set_combo_box_destiny)
 
 
     def set_combo_box_destiny(self):
@@ -202,6 +212,10 @@ class MainWindow(QMainWindow):
         self.data_dny = pandas_pyside.get_products_by_warehouse(txt_cmbx_dny,kind_dny)
 
         self.set_table_from_dataframe(data=self.data_dny)
+
+        self.current_origin = txt_cmbx_ogn
+        self.current_destiny = txt_cmbx_dny
+        # label set text for current transfer selection
 
 
     def table_get_current_data(self):
@@ -372,6 +386,15 @@ class MainWindow(QMainWindow):
         self.messagebox_no_key_name.setIcon(QMessageBox.Warning)
         self.messagebox_no_key_name.setStandardButtons(QMessageBox.Ok)
         self.messagebox_no_key_name.exec_()
+
+
+    def open_messagebox_change_warehouse(self, warehouse_ogn: str, warehouse_dny: str):
+        self.messagebox_change_warehouse = QMessageBox()
+        self.messagebox_change_warehouse.setWindowTitle("Cambio de almacén")
+        self.messagebox_change_warehouse.setText(f'¿Estas seguro que deseas descartar los cambios actuales en traspaso:\n {warehouse_ogn} -> {warehouse_dny}?')
+        self.messagebox_change_warehouse.setIcon(QMessageBox.Warning)
+        self.messagebox_change_warehouse.setStandardButtons(QMessageBox.Ok|QMessageBox.Cancel)
+        self.messagebox_change_warehouse.exec_()
 
 
 if __name__ == "__main__":
