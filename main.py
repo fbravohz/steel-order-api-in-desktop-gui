@@ -65,7 +65,6 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
-        self.isDoubleClicked = False
 
         # Class attributes that hold the current warehouses selection
         self.current_origin = ""
@@ -82,7 +81,8 @@ class MainWindow(QMainWindow):
         # Signal catching section
         self.ui.pushButton_save.clicked.connect(self.table_save_data)
         self.ui.pushButton_pull.clicked.connect(self.table_pull_data)
-        self.ui.tableWidget.cellDoubleClicked.connect(self.cell_double_clicked)
+
+        # Catches the signal of cellChanged and calls self.cell_changed method
         self.ui.tableWidget.cellChanged.connect(self.cell_changed)
 
         # Catches the signals when the user has an active warehouses transfer
@@ -91,14 +91,27 @@ class MainWindow(QMainWindow):
         self.ui.comboBox_destiny.activated.connect(self.change_warehouse_selection)
 
 
-    def cell_double_clicked(self, row, col):
-        self.isDoubleClicked = True
+    def cell_changed(self, row: int, col: int):
+        """This method evaluates if the changed cell is selected by user, and\n
+        then performs the corresponding operations.\n
+        If it is not selected by user, means the cell has been changed by\n
+        an algorithmic way and it will be ignored.\n
 
+        Args:
+            row (int): receives the row number
+            col (int): receives the column number
+        """
 
-    def cell_changed(self, row, col):
-        if(self.isDoubleClicked):
+        # Gets the QTableWidgetItem in the (row, col) position
+        table_item = self.ui.tableWidget.item(row,col)
+
+        # Ask if the item in the received cordinates is selected
+        selected = self.ui.tableWidget.isItemSelected(table_item)
+
+        # If it is selected, perform evaluations and operations
+        if selected:
             self.table_evaluate_cell_changed(row,col)
-            self.isDoubleClicked = False
+        # Otherwise it will be ignored
 
 
     def change_warehouse_selection(self):
@@ -298,7 +311,6 @@ class MainWindow(QMainWindow):
         # This proccess will be executed only when modified column is 3 and will check
         # if the event cell doubleClicked has happened just before editing. Otherwise means
         # that the cell wasn't modified by a user but by the algorithm.
-        if self.isDoubleClicked:
             if(col == 5):
 
                 # This statement ensures that when you delete data on cell, it becomes 0
