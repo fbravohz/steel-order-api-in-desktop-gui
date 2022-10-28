@@ -65,7 +65,10 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
-        self.isDoubleClicked = False
+
+        # Class attributes that hold the current warehouses selection
+        self.current_origin = ""
+        self.current_destiny = ""
 
         # Make the window maximizable and minimizable
         self.setWindowFlag(Qt.WindowMaximizeButtonHint, True)
@@ -78,18 +81,81 @@ class MainWindow(QMainWindow):
         # Signal catching section
         self.ui.pushButton_save.clicked.connect(self.table_save_data)
         self.ui.pushButton_pull.clicked.connect(self.table_pull_data)
-        self.ui.tableWidget.cellDoubleClicked.connect(self.cell_double_clicked)
+
+        # Catches the signal of cellChanged and calls self.cell_changed method
         self.ui.tableWidget.cellChanged.connect(self.cell_changed)
 
+        # Catches the signals when the user has an active warehouses transfer
+        # and creates a confirmation if user really wants to discard changes
+        self.ui.comboBox_origin.activated.connect(self.change_warehouse_selection)
+        self.ui.comboBox_destiny.activated.connect(self.change_warehouse_selection)
 
-    def cell_double_clicked(self, row, col):
-        self.isDoubleClicked = True
 
+    def cell_changed(self, row: int, col: int):
+        """This method evaluates if the changed cell is selected by user, and\n
+        then performs the corresponding operations.\n
+        If it is not selected by user, means the cell has been changed by\n
+        an algorithmic way and it will be ignored.\n
 
-    def cell_changed(self, row, col):
-        if(self.isDoubleClicked):
+        Args:
+            row (int): receives the row number
+            col (int): receives the column number
+        """
+
+        # Gets the QTableWidgetItem in the (row, col) position
+        table_item = self.ui.tableWidget.item(row,col)
+
+        # Ask if the item in the received cordinates is selected
+        selected = self.ui.tableWidget.isItemSelected(table_item)
+
+        # If it is selected, perform evaluations and operations
+        if selected:
             self.table_evaluate_cell_changed(row,col)
-            self.isDoubleClicked = False
+        # Otherwise it will be ignored
+
+
+    def change_warehouse_selection(self):
+        """A function that asks the user if he wants to discard his changes\n
+        when he selects another warehouses transfer transaction, if he doesn't\n
+        resets the warehouses selection to the previous state.
+        """
+        # Evaluate one of two conditions are true (OR)
+        # each of them should be an (AND) condition
+        # The first is that current index in combobox origin is diff to zero
+        # AND the class attribute: current_origin is diff to current text in
+        # combobox origin
+        # OR the current index in combobox destiny is diff to zero
+        # AND the class attribute: current_destiny is diff to current text in
+        # combobox destiny
+        if ((self.ui.comboBox_origin.currentIndex() != 0 and
+            self.current_origin != self.ui.comboBox_origin.currentText()) or
+            (self.ui.comboBox_destiny.currentIndex() != 0 and
+            self.current_destiny != self.ui.comboBox_destiny.currentText())):
+
+            # Evaluate that class attributes: current_origin and current_destiny
+            # are different to "" empty string
+            if (self.current_origin != "" and self.current_destiny != ""):
+
+                # Calls the message box to ask if the user wants to discard
+                # changes to the current transfer wh1 ➡ wh2
+                self.open_messagebox_change_warehouse(self.current_origin,
+                                                        self.current_destiny)
+
+                # if the user rejected to discard changes, then reset the
+                # warehouses selection to the last pulled, it is current_origin
+                # and current_destiny class attributes.
+                if self.messagebox_change_warehouse.result() != 1024:
+                    self.ui.comboBox_origin.setCurrentText(self.current_origin)
+                    self.ui.comboBox_destiny.setCurrentText(self.current_destiny)
+
+                # If the user choose to discard changes, then the table is cleared
+                # and the class attributes current_destiny and origin are cleared
+                # last, the label that contains the current transfer is cleared
+                else:
+                    self.ClearTableWidgetData()
+                    self.current_destiny = ""
+                    self.current_origin = ""
+                    self.ui.label_current_warehouses.setText("")
 
 
     def set_table_from_dataframe(self, data: pd.DataFrame):
@@ -161,8 +227,7 @@ class MainWindow(QMainWindow):
 
         self.ui.comboBox_origin.insertItem(0, "")
         self.ui.comboBox_origin.insertItems(1, warehouses_list)
-        self.ui.comboBox_origin.currentTextChanged.connect(
-            self.set_combo_box_destiny)
+        self.ui.comboBox_origin.currentTextChanged.connect(self.set_combo_box_destiny)
 
 
     def set_combo_box_destiny(self):
@@ -203,6 +268,15 @@ class MainWindow(QMainWindow):
 
         self.set_table_from_dataframe(data=self.data_dny)
 
+        # Class attributes that are going to be accesed outside the function
+        # contains the names of the current origin and destiny warehouses
+        self.current_origin = txt_cmbx_ogn
+        self.current_destiny = txt_cmbx_dny
+
+        # Setting text for label_current_warehouses in current transfer selection
+        TXT = f'Transfiriendo:\n{self.current_origin} ➡ {self.current_destiny}'
+        self.ui.label_current_warehouses.setText(TXT)
+
 
     def table_get_current_data(self):
 
@@ -237,7 +311,6 @@ class MainWindow(QMainWindow):
         # This proccess will be executed only when modified column is 3 and will check
         # if the event cell doubleClicked has happened just before editing. Otherwise means
         # that the cell wasn't modified by a user but by the algorithm.
-        if self.isDoubleClicked:
             if(col == 5):
 
                 # This statement ensures that when you delete data on cell, it becomes 0
@@ -372,6 +445,24 @@ class MainWindow(QMainWindow):
         self.messagebox_no_key_name.setIcon(QMessageBox.Warning)
         self.messagebox_no_key_name.setStandardButtons(QMessageBox.Ok)
         self.messagebox_no_key_name.exec_()
+
+
+    def open_messagebox_change_warehouse(self, warehouse_ogn: str, warehouse_dny: str):
+        """A function that opens a MessageBox asking the user to confirm and
+        discard the current changes or continue with current state.
+
+        Args:
+            warehouse_ogn (str): the string of current origin warehouse
+            warehouse_dny (str): the string of current destiny warehouse
+        """
+        self.messagebox_change_warehouse = QMessageBox()
+        self.messagebox_change_warehouse.setWindowTitle("Cambio de almacén")
+        TXT = '¿Estas seguro que deseas descartar los cambios actuales en'\
+            + f' traspaso:\n {warehouse_ogn} ➡ {warehouse_dny}?'
+        self.messagebox_change_warehouse.setText(TXT)
+        self.messagebox_change_warehouse.setIcon(QMessageBox.Warning)
+        self.messagebox_change_warehouse.setStandardButtons(QMessageBox.Ok|QMessageBox.Cancel)
+        self.messagebox_change_warehouse.exec_()
 
 
 if __name__ == "__main__":
