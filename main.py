@@ -66,6 +66,8 @@ class MainWindow(QMainWindow):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         self.isDoubleClicked = False
+
+        # Class attributes that hold the current warehouses selection
         self.current_origin = ""
         self.current_destiny = ""
 
@@ -82,15 +84,11 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_pull.clicked.connect(self.table_pull_data)
         self.ui.tableWidget.cellDoubleClicked.connect(self.cell_double_clicked)
         self.ui.tableWidget.cellChanged.connect(self.cell_changed)
-        
-        def highlight(index: int):
-            if (self.ui.comboBox_origin.currentIndex() != 0) and (self.ui.comboBox_destiny.currentIndex() != 0):
-                if self.current_origin != "" and self.current_destiny != "":
-                    print("Highlighted at: ",index)
-                    self.open_messagebox_change_warehouse(self.current_origin, self.current_destiny)
-                    
-        self.ui.comboBox_origin.highlighted.connect(highlight)
-        self.ui.comboBox_destiny.highlighted.connect(highlight)
+
+        # Catches the signals when the user has an active warehouses transfer
+        # and creates a confirmation if user really wants to discard changes
+        self.ui.comboBox_origin.activated.connect(self.change_warehouse_selection)
+        self.ui.comboBox_destiny.activated.connect(self.change_warehouse_selection)
 
 
     def cell_double_clicked(self, row, col):
@@ -101,6 +99,50 @@ class MainWindow(QMainWindow):
         if(self.isDoubleClicked):
             self.table_evaluate_cell_changed(row,col)
             self.isDoubleClicked = False
+
+
+    def change_warehouse_selection(self):
+        """A function that asks the user if he wants to discard his changes\n
+        when he selects another warehouses transfer transaction, if he doesn't\n
+        resets the warehouses selection to the previous state.
+        """
+        # Evaluate one of two conditions are true (OR)
+        # each of them should be an (AND) condition
+        # The first is that current index in combobox origin is diff to zero
+        # AND the class attribute: current_origin is diff to current text in
+        # combobox origin
+        # OR the current index in combobox destiny is diff to zero
+        # AND the class attribute: current_destiny is diff to current text in
+        # combobox destiny
+        if ((self.ui.comboBox_origin.currentIndex() != 0 and
+            self.current_origin != self.ui.comboBox_origin.currentText()) or
+            (self.ui.comboBox_destiny.currentIndex() != 0 and
+            self.current_destiny != self.ui.comboBox_destiny.currentText())):
+
+            # Evaluate that class attributes: current_origin and current_destiny
+            # are different to "" empty string
+            if (self.current_origin != "" and self.current_destiny != ""):
+
+                # Calls the message box to ask if the user wants to discard
+                # changes to the current transfer wh1 ➡ wh2
+                self.open_messagebox_change_warehouse(self.current_origin,
+                                                        self.current_destiny)
+
+                # if the user rejected to discard changes, then reset the
+                # warehouses selection to the last pulled, it is current_origin
+                # and current_destiny class attributes.
+                if self.messagebox_change_warehouse.result() != 1024:
+                    self.ui.comboBox_origin.setCurrentText(self.current_origin)
+                    self.ui.comboBox_destiny.setCurrentText(self.current_destiny)
+
+                # If the user choose to discard changes, then the table is cleared
+                # and the class attributes current_destiny and origin are cleared
+                # last, the label that contains the current transfer is cleared
+                else:
+                    self.ClearTableWidgetData()
+                    self.current_destiny = ""
+                    self.current_origin = ""
+                    self.ui.label_current_warehouses.setText("")
 
 
     def set_table_from_dataframe(self, data: pd.DataFrame):
@@ -213,9 +255,14 @@ class MainWindow(QMainWindow):
 
         self.set_table_from_dataframe(data=self.data_dny)
 
+        # Class attributes that are going to be accesed outside the function
+        # contains the names of the current origin and destiny warehouses
         self.current_origin = txt_cmbx_ogn
         self.current_destiny = txt_cmbx_dny
-        # label set text for current transfer selection
+
+        # Setting text for label_current_warehouses in current transfer selection
+        TXT = f'Transfiriendo:\n{self.current_origin} ➡ {self.current_destiny}'
+        self.ui.label_current_warehouses.setText(TXT)
 
 
     def table_get_current_data(self):
@@ -389,9 +436,18 @@ class MainWindow(QMainWindow):
 
 
     def open_messagebox_change_warehouse(self, warehouse_ogn: str, warehouse_dny: str):
+        """A function that opens a MessageBox asking the user to confirm and
+        discard the current changes or continue with current state.
+
+        Args:
+            warehouse_ogn (str): the string of current origin warehouse
+            warehouse_dny (str): the string of current destiny warehouse
+        """
         self.messagebox_change_warehouse = QMessageBox()
         self.messagebox_change_warehouse.setWindowTitle("Cambio de almacén")
-        self.messagebox_change_warehouse.setText(f'¿Estas seguro que deseas descartar los cambios actuales en traspaso:\n {warehouse_ogn} -> {warehouse_dny}?')
+        TXT = '¿Estas seguro que deseas descartar los cambios actuales en'\
+            + f' traspaso:\n {warehouse_ogn} ➡ {warehouse_dny}?'
+        self.messagebox_change_warehouse.setText(TXT)
         self.messagebox_change_warehouse.setIcon(QMessageBox.Warning)
         self.messagebox_change_warehouse.setStandardButtons(QMessageBox.Ok|QMessageBox.Cancel)
         self.messagebox_change_warehouse.exec_()
