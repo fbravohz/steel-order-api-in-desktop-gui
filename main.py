@@ -5,6 +5,7 @@
 #     pyside2-uic form.ui -o ui_form.py
 #     pyside2-uic ui\mainwindow.ui -o ui\ui_mainwindow.py
 
+from cgitb import text
 from gc import isenabled
 from http import client
 from math import prod
@@ -92,8 +93,8 @@ class MainWindow(QMainWindow):
 
 
     def cell_changed(self, row: int, col: int):
-        """This method evaluates if the changed cell is selected by user, and\n
-        then performs the corresponding operations.\n
+        """This method evaluates if the changed cell is selected by user,\n
+        and then performs the corresponding operations.\n
         If it is not selected by user, means the cell has been changed by\n
         an algorithmic way and it will be ignored.\n
 
@@ -138,8 +139,8 @@ class MainWindow(QMainWindow):
 
                 # Calls the message box to ask if the user wants to discard
                 # changes to the current transfer wh1 ➡ wh2
-                self.open_messagebox_change_warehouse(self.current_origin,
-                                                        self.current_destiny)
+                self.open_messagebox_change_warehouse(
+                    self.current_origin, self.current_destiny)
 
                 # if the user rejected to discard changes, then reset the
                 # warehouses selection to the last pulled, it is current_origin
@@ -159,10 +160,15 @@ class MainWindow(QMainWindow):
 
 
     def set_table_from_dataframe(self, data: pd.DataFrame):
-        """_summary_
+        """Create and fill a table that contains the given dataframe in a\n
+        QTableWidget. If there is a table already, it is cleared, and a new\n
+        one is set. It also controls the animation of refreshing a table and\n
+        the progress bar animation. Finally, it also handles with empty\n
+        dataframes and controls the labels that inform this issues.
 
         Args:
-            data (pd.DataFrame): _description_
+            data (pd.DataFrame): Receives a pandas dataframe containing the\n
+            information to fill the table.
         """
         self.ClearTableWidgetData()
 
@@ -308,98 +314,246 @@ class MainWindow(QMainWindow):
 
 
     def table_evaluate_cell_changed(self,row,col):
-        # This proccess will be executed only when modified column is 3 and will check
-        # if the event cell doubleClicked has happened just before editing. Otherwise means
-        # that the cell wasn't modified by a user but by the algorithm.
-            if(col == 5):
 
-                # This statement ensures that when you delete data on cell, it becomes 0
-                if self.ui.tableWidget.item(row,col).data(0) == "":
-                    self.ui.tableWidget.item(row,col).setText(str(0))
-                # Initialize destiny local variables
-                dny_transfer = 0
-                dny_present = 0
-                # Evaluate if the transfer amount in destiny table contains non numeric types
-                try:
-                    dny_transfer = int(self.ui.tableWidget.item(row,col).data(0))
-                    # If the amount to transfer is negative, throws a messagebox and sets the
-                    # cell changed to zero
-                    if dny_transfer < 0:
-                        self.open_messagebox_negative_number()
-                        self.ui.tableWidget.item(row,col).setText(str(0))
-                        return None
-                # If a non numeric value is present an exception is raised of type ValueError
-                except ValueError:
-                    # Opens a dialog with a warning of a non numeric value
-                    self.open_messagebox_value_error(str(self.ui.tableWidget.item(row,col).data(0)))
-                    # Set the wrong value to zero in the table and in the local variable dny_transfer
-                    self.ui.tableWidget.item(row,col).setText(str(0))
+        def error_add():
+            present_row = int(self.ui.tableWidget.item(row,4).text())
+            transfer_row = int(self.ui.tableWidget.item(row,5).text())
+            error_row = int(self.ui.tableWidget.item(row,7).text())
+            future_row = present_row + transfer_row + error_row
+            self.ui.tableWidget.item(row,6).setText(str(future_row))
 
-                # Gets the full-reference string of the modified product stored in column 0
-                for i in range(self.ui.tableWidget.columnCount()):
-                    header_item: QTableWidgetItem = self.ui.tableWidget.horizontalHeaderItem(i)
-                    if(header_item.text() == 'codigo'):
-                        dny_transfer_product = str(self.ui.tableWidget.item(row,i).data(0))
 
-                # Create a mask or filter, in order to find the cells
-                # that contain the full-reference of product in the origin dataframe
-                # this helps a lot because doesn't matter how unorganized are the
-                # QTableWidget data, we will always find the correct row to modify
-                # with the given dny_transfer_product
-                mask = self.data_ogn.loc[:,'codigo'] == dny_transfer_product
+        def error_subs(data: pd.DataFrame):
 
-                # Receive the value of the index for the first incidence
-                idx = self.data_ogn[mask].index.values[0]
+            for error_code in data['error-code']:
 
-                # With the given index we put the value of the received amount to transfer
-                # into the data origin dataframe, but multiplied by (-) minus
-                # so a positive transfer in warehouse B is a negative in warehouse A
-                self.data_ogn.at[idx,'traspaso'] = (-(dny_transfer))
+                if(not data.empty):
+                    mask = data['error-code'] == error_code
+                    to_subs = data[mask].loc[:,'error-amount'].sum()
 
-                # Cast the values of the dataframe of columns 'presente' and 'traspaso'
-                ogn_present = int(str(self.data_ogn.loc[idx,'presente']))
-                ogn_transfer = int(str(self.data_ogn.loc[idx,'traspaso']))
+                    for i in range(self.ui.tableWidget.rowCount()):
+                        product = self.ui.tableWidget.item(i,2).text()
 
-                # Puts the value of the sum of the current stock plus the transfer
-                # the transfer is gonna take from the present and assing all the sum
-                # into the column 'futuro'
-                self.data_ogn.at[idx,'futuro'] = ogn_present + ogn_transfer
+                        if(error_code == product):
+                            present_row = int(self.ui.tableWidget.item(i, 4).text())
+                            transfer_row = int(self.ui.tableWidget.item(i, 5).text())
+                            error_row = int(self.ui.tableWidget.item(i, 7).text())
+                            future_row = present_row + transfer_row + error_row - to_subs
+                            # if(future_row < 0):
+                            #     self.open_messagebox_no_stock(self.current_destiny, product, present_row, future_row, "destino")
+                            #     if(self.messagebox_no_stock.result() != 1024):
+                            #         future_row = present_row + transfer_row + error_row
+                            #         self.ui.tableWidget.item(i, 6).setText(str(future_row))
+                            #         self.ui.tableWidget.item(row, 7).setText(str(0))
+                            #         return
+                            self.ui.tableWidget.item(i, 6).setText(str(future_row))
 
-                # Store the new 'futuro' column's value into local variable
-                ogn_future = int(str(self.data_ogn.at[idx,'futuro']))
+                    indexes = data[mask].loc[:,'error-amount'].index.to_list()
+                    data = data.drop(indexes)
 
-                # Assign the destiny present value into local variable
-                dny_present = int(self.ui.tableWidget.item(row,col-1).data(0))
 
-                # Evaluate if the future value of origin dataframe is less equal to 0
-                if(self.data_ogn.at[idx,'futuro'] < 0):
-
-                    # Opens a messagebox with the warning of insuficient stock
-                    self.open_messagebox_no_stock(self.ui.comboBox_origin.currentText(), dny_transfer_product, str(ogn_present), str(ogn_future))
-
-                    # The result code of opening this messagebox should be 1024 if accepted
-                    if self.messagebox_no_stock.result() == 1024:
-
-                        # We have permission to transfer
-                        self.ui.tableWidget.item(row,col+1).setText((str(dny_present + dny_transfer)))
-
-                    # If the code is other, we will set the following
-                    else:
-
-                        # The QWidgetTable.item(row,col) which is the value of dny_transfer
-                        # is set to zero
-                        self.ui.tableWidget.item(row,col).setText(str(0))
-                        # The QWidgetTable.item(row,col+1) which is the value corresponding to dny_future
-                        # is set to QWidgetTable.item(row,col-1) which is the value of dny_present
-                        self.ui.tableWidget.item(row,col+1).setText(str(self.ui.tableWidget.item(row,col-1).text()))
-
-                # If the future value of origin is higher than 0, we have permission to transfer
+            # This process runs a for cicle because is executed in every
+            # cell change, in order to catch any minimal modification.
+        def error_code_handler():
+            errors = {"error-code":[], "error-amount": []}
+            for i in range(self.ui.tableWidget.rowCount()):
+                error_code = self.ui.tableWidget.item(i,8).text()
+                if(error_code != ""):
+                    error_amount = int(self.ui.tableWidget.item(i,7).text())
+                    errors["error-code"].append(str(error_code))
+                    errors["error-amount"].append(error_amount)
                 else:
-                    self.ui.tableWidget.item(row,col+1).setText((str(dny_present + dny_transfer)))
-
-            if(col == 8):
-                if(self.ui.tableWidget.item(row,col).text != ""):
                     pass
+            errors = pd.DataFrame(errors)
+            error_add()
+            error_subs(errors)
+
+
+    # This proccess will be executed only when modified column is 5 and will
+    # check if the cell is currently selected has happened just before
+    # editing. Otherwise means that the cell wasn't modified by a user
+    # but by the algorithm.
+        if(col == 5):
+
+            # This statement ensures that when you delete data on cell,
+            # it becomes 0
+            if self.ui.tableWidget.item(row,5).text() == "":
+                self.ui.tableWidget.item(row,5).setText(str(0))
+            # Initialize destiny local variables
+            dny_transfer = 0
+            dny_present = 0
+            # Evaluate if the transfer amount in destiny table contains non
+            # numeric types
+            try:
+                dny_transfer = int(self.ui.tableWidget.item(row,5).text())
+                # If the amount to transfer is negative, throws a messagebox
+                # and sets the cell changed to zero
+                if dny_transfer < 0:
+                    self.open_messagebox_negative_number()
+                    self.ui.tableWidget.item(row,col).setText(str(0))
+                    return
+            # If a non numeric value is present an exception is raised
+            except ValueError:
+                # Opens a dialog with a warning of a non numeric value
+                self.open_messagebox_value_error(
+                    str(self.ui.tableWidget.item(row,col).data(0)))
+                # Set the wrong value to zero in the table and in the local
+                # variable dny_transfer
+                self.ui.tableWidget.item(row,col).setText(str(0))
+
+            # Gets the full-reference string of the modified product stored
+            # in column 0
+            for i in range(self.ui.tableWidget.columnCount()):
+                header_item: QTableWidgetItem
+                header_item = self.ui.tableWidget.horizontalHeaderItem(i)
+                if(header_item.text() == 'codigo'):
+                    dny_transfer_product = str(
+                        self.ui.tableWidget.item(row,i).data(0))
+
+            # Create a mask or filter, in order to find the cells
+            # that contain the full-reference of product in the origin
+            # dataframe this helps a lot because doesn't matter how
+            # unorganized are the QTableWidget data, we will always
+            # find the correct row to modify with the given
+            # dny_transfer_product
+            mask = self.data_ogn.loc[:,'codigo'] == dny_transfer_product
+
+            # Receive the value of the index for the first incidence
+            idx = self.data_ogn[mask].index.values[0]
+
+            # With the given index we put the value of the received amount
+            # to transfer into the data origin dataframe,
+            # but multiplied by (-) minus so a positive transfer in
+            # warehouse B is a negative in warehouse A
+            self.data_ogn.at[idx,'traspaso'] = (-(dny_transfer))
+
+            # Cast the values of the dataframe of columns 'presente'
+            # and 'traspaso'
+            ogn_present = int(str(self.data_ogn.loc[idx,'presente']))
+            ogn_transfer = int(str(self.data_ogn.loc[idx,'traspaso']))
+
+            # Puts the value of the sum of the current stock plus the transfer
+            # the transfer is gonna take from the present and assing all
+            # the sum into the column 'futuro'
+            self.data_ogn.at[idx,'futuro'] = ogn_present + ogn_transfer
+
+            # Store the new 'futuro' column's value into local variable
+            ogn_future = int(str(self.data_ogn.at[idx,'futuro']))
+
+            # Assign the destiny present value into local variable
+            dny_present = int(self.ui.tableWidget.item(row,col-1).data(0))
+
+            # Evaluate if the future value of origin dataframe is
+            # less equal to 0
+            if(self.data_ogn.at[idx,'futuro'] < 0):
+
+                # Opens a messagebox with the warning of insuficient stock
+                self.open_messagebox_no_stock(
+                    self.ui.comboBox_origin.currentText(),
+                    dny_transfer_product,
+                    str(ogn_present),
+                    str(ogn_future),
+                    "origen")
+
+                # The result code of opening this messagebox should be
+                # 1024 if accepted
+                if self.messagebox_no_stock.result() == 1024:
+
+                    # We have permission to transfer
+                    self.ui.tableWidget.item(row,col+1).setText(
+                        (str(dny_present + dny_transfer)))
+
+                # If the code is other, we will set the following
+                else:
+
+                    # The QWidgetTable.item(row,col) which is the value
+                    # of dny_transfer
+                    # is set to zero
+                    self.ui.tableWidget.item(row,col).setText(str(0))
+                    # The QWidgetTable.item(row,col+1) which is the value
+                    # corresponding to dny_future
+                    # is set to QWidgetTable.item(row,col-1) which is the
+                    # value of dny_present
+                    self.ui.tableWidget.item(row,col+1).setText(
+                        str(self.ui.tableWidget.item(row,col-1).text()))
+
+            # If the future value of origin is higher than 0,
+            # we have permission to transfer
+            else:
+                self.ui.tableWidget.item(row,col+1).setText(
+                    (str(dny_present + dny_transfer)))
+
+        # This statement will help us to catch typing errors
+        # specifically from the column 7.
+        if(col == 7):
+
+            # This statement ensures that when you delete data on cell,
+            # it becomes 0
+            if self.ui.tableWidget.item(row,7).text() == "":
+                # Sets the error number to zero
+                self.ui.tableWidget.item(row,7).setText(str(0))
+
+            # Evaluate if the error amount contains non numeric types
+            try:
+                error = int(self.ui.tableWidget.item(row,7).text())
+                # If the error amount is negative
+                if error < 0:
+                    # Throws a messagebox and sets the cell changed to zero
+                    self.open_messagebox_negative_number()
+                    self.ui.tableWidget.item(row,7).setText(str(0))
+                    return
+
+            # If a non numeric value is present,
+            # an exception is raised of type ValueError
+            except ValueError:
+                # Opens a dialog with a warning of a non numeric value
+                self.open_messagebox_value_error(
+                    str(self.ui.tableWidget.item(row,col).text()))
+                # Set the wrong value to zero in the table
+                self.ui.tableWidget.item(row,col).setText(str(0))
+
+            # Evaluates that there is an error code, in the same row of
+            # the error number
+            if (self.ui.tableWidget.item(row,8).text() == "" and
+                int(self.ui.tableWidget.item(row,7).text()) != 0):
+                # If not, opens a messagebox asking for error code first
+                self.open_messagebox_select_errorcode_first()
+                # Sets the error number to zero
+                self.ui.tableWidget.item(row, 7).setText(str(0))
+
+
+        if(col == 8):
+            found_row: int = -1
+            if(self.ui.tableWidget.item(row,8).text() != ""):
+                code_to_find = self.ui.tableWidget.item(row,8).text()
+                for i in range(self.ui.tableWidget.rowCount()):
+                    iterated_text = self.ui.tableWidget.item(i,2).text()
+                    if iterated_text == code_to_find:
+                        found_row = i
+                        break
+                if found_row == -1:
+                    self.open_messagebox_error_code_not_found(code_to_find)
+                    self.ui.tableWidget.item(row,8).setText("")
+                    self.ui.tableWidget.item(row,7).setText(str(0))
+
+            # Messagebox for product equals error-code
+            if(self.ui.tableWidget.item(row,8).text() == self.ui.tableWidget.item(row,2).text()):
+                self.open_messagebox_errorcode_is_self()
+                self.ui.tableWidget.item(row, 8).setText("")
+                self.ui.tableWidget.item(row, 7).setText(str(0))
+
+
+        if(col == 5 or col == 7 or col == 8):
+            error_code_handler()
+
+            # if (find_error_code() != -1):
+            #     if(self.ui.tableWidget.item(row,col-1))
+            # if(self.ui.tableWidget.item(row,col).text() != ""):
+            #     print(self.ui.tableWidget.item(row,col).text())
+
+        #if((col == 8 or col ==7) and (self.ui.tableWidget.item(row,col).text() != )):
+
+
 
     # Open dialog with button ok
     def open_messagebox_value_error(self, word: str):
@@ -412,10 +566,10 @@ class MainWindow(QMainWindow):
 
 
         # Open dialog with button ok and cancel
-    def open_messagebox_no_stock(self, warehouse_ogn: str, product: str, current_stock: str, final_stock: str):
+    def open_messagebox_no_stock(self, warehouse_ogn: str, product: str, current_stock: str, final_stock: str, kind: str):
         self.messagebox_no_stock = QMessageBox()
         self.messagebox_no_stock.setWindowTitle("Stock insuficiente")
-        string_format = f"El almacen de origen {warehouse_ogn} con {current_stock} unidades de {product} quedará con {final_stock} al finalizar la operación. ¿Desea continuar?"
+        string_format = f"El almacen de {kind} {warehouse_ogn} con {current_stock} unidades de {product} quedará con {final_stock} al finalizar la operación. ¿Desea continuar?"
         self.messagebox_no_stock.setText(string_format)
         self.messagebox_no_stock.setIcon(QMessageBox.Warning)
         self.messagebox_no_stock.setStandardButtons(QMessageBox.Ok|QMessageBox.Cancel)
@@ -466,6 +620,37 @@ class MainWindow(QMainWindow):
         self.messagebox_change_warehouse.setIcon(QMessageBox.Warning)
         self.messagebox_change_warehouse.setStandardButtons(QMessageBox.Ok|QMessageBox.Cancel)
         self.messagebox_change_warehouse.exec_()
+
+
+    def open_messagebox_error_code_not_found(self, code: int):
+        self.messagebox_error_code_not_found = QMessageBox()
+        self.messagebox_error_code_not_found.setWindowTitle("No se encontró")
+        TXT = f'No se encontro el código de producto \"{code}\".'\
+            + f'\nIntenta nuevamente.'
+        self.messagebox_error_code_not_found.setText(TXT)
+        self.messagebox_error_code_not_found.setIcon(QMessageBox.Warning)
+        self.messagebox_error_code_not_found.setStandardButtons(QMessageBox.Ok)
+        self.messagebox_error_code_not_found.exec_()
+
+
+    def open_messagebox_select_errorcode_first(self):
+        self.messagebox_select_errorcode_first = QMessageBox()
+        self.messagebox_select_errorcode_first.setWindowTitle("No se encontró código de error")
+        TXT = f'Por favor selecciona un código de error primero.'
+        self.messagebox_select_errorcode_first.setText(TXT)
+        self.messagebox_select_errorcode_first.setIcon(QMessageBox.Warning)
+        self.messagebox_select_errorcode_first.setStandardButtons(QMessageBox.Ok)
+        self.messagebox_select_errorcode_first.exec_()
+
+
+    def open_messagebox_errorcode_is_self(self):
+        self.messagebox_errorcode_is_self = QMessageBox()
+        self.messagebox_errorcode_is_self.setWindowTitle("Error en código")
+        TXT = f'Error: El código de producto y error no pueden ser el mismo.'
+        self.messagebox_errorcode_is_self.setText(TXT)
+        self.messagebox_errorcode_is_self.setIcon(QMessageBox.Warning)
+        self.messagebox_errorcode_is_self.setStandardButtons(QMessageBox.Ok)
+        self.messagebox_errorcode_is_self.exec_()
 
 
 if __name__ == "__main__":

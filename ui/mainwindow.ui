@@ -67,6 +67,11 @@
        <number>0</number>
       </property>
       <widget class="QWidget" name="tab_warehouses">
+       <property name="font">
+        <font>
+         <pointsize>7</pointsize>
+        </font>
+       </property>
        <attribute name="title">
         <string>Almacenes</string>
        </attribute>

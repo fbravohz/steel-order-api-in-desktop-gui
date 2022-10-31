@@ -151,8 +151,8 @@ class PandasToPyside():
         # Convert the data that should be int from string to int32
         df_destiny = df_destiny.astype({'traspaso':'int','presente':'int', 'futuro': 'int', 'error': 'int'})
         df_origin = df_origin.astype({'traspaso':'int','presente':'int', 'futuro': 'int', 'error': 'int'})
-        mask_origin = df_origin['traspaso'] != 0
-        mask_destiny = df_destiny['traspaso'] != 0
+        mask_origin = df_origin['futuro'] != df_origin['presente']
+        mask_destiny = df_destiny['futuro'] != df_origin['presente']
         changes_in_origin = df_origin[mask_origin]
         changes_in_destiny = df_destiny[mask_destiny]
 
