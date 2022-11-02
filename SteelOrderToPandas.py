@@ -19,9 +19,13 @@ class SteelOrderToPandas():
         """Reads the apikey file and loads the string into
         self.apikey attribute.
         """
-        with open('apikey', 'r', encoding='utf-8') as f:
-            self.apikey = f.readline()
-
+        try:
+            #with open('apikey.txt', 'r', encoding='utf-8') as f:
+                #self.apikey = f.readline()
+            self.apikey = "7ldliedFPem1K2nyZEpPwma0dFbZm0HUEwwyyepC"
+        except FileNotFoundError:
+            self.apikey = ""
+            print("No se encontró el archivo apikey")
     def request_warehouses(self) -> pd.DataFrame:
         """Requests all warehouses data from steel order's api.
 

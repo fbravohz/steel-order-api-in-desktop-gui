@@ -73,7 +73,7 @@ class MainWindow(QMainWindow):
         self.current_destiny = ""
 
         # The path of the icon
-        self.ICON_PATH = 'images/baymed_logo_final.jpg'
+        self.ICON_PATH = 'baymed_logo_final.ico'
 
         # Make the window maximizable and minimizable
         self.setWindowFlag(Qt.WindowMaximizeButtonHint, True)
